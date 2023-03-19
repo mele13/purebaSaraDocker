@@ -1,0 +1,74 @@
+version: "3.7"
+
+services:
+    app:
+        build: docker/php
+        restart: always
+        working_dir: /application
+        volumes:
+            - ./Server:/application
+            - ./docker/php/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini
+        depends_on:
+            - mysql
+        networks:
+            ntw:
+                ipv4_address: 172.16.0.4
+
+    appserver:
+        build: './Client'
+        working_dir: /application
+        ports:
+          - "${SERVER_PORT}:81"
+        volumes:
+            - ./Client:/application
+        networks:
+            ntw:
+                ipv4_address: 172.16.0.5
+
+    nginx:
+        image: nginx
+        restart: always
+        working_dir: /application
+        depends_on:
+            - app
+        ports:
+            - "${NGINX_PORT}:80"
+        volumes:
+            - .:/application
+            - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+            - ./docker/nginx/timeout.conf:/etc/nginx/conf.d/timeout.conf:ro
+        networks:
+            ntw:
+                ipv4_address: 172.16.0.2
+
+    mysql:
+        image: mysql/mysql-server:5.7
+        restart: always
+        working_dir: /application
+        ports:
+            - "${MYSQL_PORT}:3306"
+        environment:
+            TZ: "${TIMEZONE}"
+            MYSQL_DATABASE: "${MYSQL_DATABASE}"
+            MYSQL_USER: "${MYSQL_USER}"
+            MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+            MYSQL_ROOT_PASSWORD: "${MYSQL_PASSWORD}"
+        volumes:
+            - mysql_volume:/var/lib/mysql
+            - ./docker/mysql/hosts.allow:/etc/hosts.allow
+        networks:
+            ntw:
+                ipv4_address: 172.16.0.3
+
+volumes:
+    mysql_volume:
+
+# Predictable networking, fixed Ip addresses
+networks:
+  ntw:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.0.0/24
+          gateway: 172.16.0.1
+
